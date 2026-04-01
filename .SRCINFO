@@ -1,0 +1,20 @@
+pkgbase = codex-switch-git
+	pkgdesc = Tray app for switching Codex auth.json profiles
+	pkgver = r1.f599ab6
+	pkgrel = 1
+	url = https://github.com/mainliufeng/codex-switch
+	arch = x86_64
+	license = custom
+	makedepends = git
+	makedepends = go
+	makedepends = gcc
+	makedepends = pkgconf
+	depends = gtk3
+	depends = libayatana-appindicator
+	depends = xdg-utils
+	provides = codex-switch
+	conflicts = codex-switch
+	source = git+https://github.com/mainliufeng/codex-switch.git
+	sha256sums = SKIP
+
+pkgname = codex-switch-git
