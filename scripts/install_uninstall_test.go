@@ -48,10 +48,21 @@ func runScript(t *testing.T, scriptsDir string, scriptName string, home string, 
 	scriptPath := filepath.Join(scriptsDir, scriptName)
 	cmd := exec.Command(scriptPath, args...)
 	cmd.Dir = filepath.Dir(scriptsDir)
-	cmd.Env = append(os.Environ(),
+	env := append(os.Environ(),
 		"HOME="+home,
 		"PREFIX="+prefix,
 	)
+	if cargoHome := os.Getenv("CARGO_HOME"); cargoHome != "" {
+		env = append(env, "CARGO_HOME="+cargoHome)
+	} else if userHome, err := os.UserHomeDir(); err == nil {
+		env = append(env, "CARGO_HOME="+filepath.Join(userHome, ".cargo"))
+	}
+	if rustupHome := os.Getenv("RUSTUP_HOME"); rustupHome != "" {
+		env = append(env, "RUSTUP_HOME="+rustupHome)
+	} else if userHome, err := os.UserHomeDir(); err == nil {
+		env = append(env, "RUSTUP_HOME="+filepath.Join(userHome, ".rustup"))
+	}
+	cmd.Env = env
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {

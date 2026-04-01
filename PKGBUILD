@@ -1,12 +1,12 @@
 pkgname=codex-switch-git
-pkgver=r1.f599ab6
+pkgver=r2.ba0613b
 pkgrel=1
-pkgdesc="Tray app for switching Codex auth.json profiles"
+pkgdesc="Desktop tray switcher for Codex login profiles"
 arch=("x86_64")
 url="https://github.com/mainliufeng/codex-switch"
 license=("custom")
 depends=("gtk3" "libayatana-appindicator" "xdg-utils")
-makedepends=("git" "go" "gcc" "pkgconf")
+makedepends=("git" "go" "pkgconf")
 provides=("codex-switch")
 conflicts=("codex-switch")
 source=("git+$url.git")
@@ -33,7 +33,7 @@ package() {
 Type=Application
 Version=1.0
 Name=Codex Switch
-Comment=Switch Codex auth.json profiles from the system tray
+Comment=Switch Codex accounts from a classic tray menu
 Exec=/usr/bin/codex-switch
 Icon=codex-switch
 Terminal=false

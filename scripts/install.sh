@@ -54,7 +54,7 @@ cat >"$DESKTOP_PATH" <<EOF
 Type=Application
 Version=1.0
 Name=Codex Switch
-Comment=Switch Codex auth.json profiles from the system tray
+Comment=Switch Codex accounts from a classic tray menu
 Exec=$BIN_PATH
 Icon=codex-switch
 Terminal=false

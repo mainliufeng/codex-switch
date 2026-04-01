@@ -3,7 +3,7 @@ package main
 import (
 	"log"
 
-	"codex-switch/internal/app"
+	"codex-switch/internal/classicapp"
 	"codex-switch/internal/profiles"
 )
 
@@ -13,6 +13,6 @@ func main() {
 		log.Fatalf("initialize profile store: %v", err)
 	}
 
-	trayApp := app.NewTrayApp(store)
+	trayApp := classicapp.NewTrayApp(store)
 	trayApp.Run()
 }

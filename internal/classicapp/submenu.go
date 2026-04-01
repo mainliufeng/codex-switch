@@ -1,12 +1,13 @@
-package app
+package classicapp
 
 import "github.com/getlantern/systray"
 
 type submenuEntry struct {
-	Key      string
-	Title    string
-	Tooltip  string
-	Disabled bool
+	Key       string
+	ActionKey string
+	Title     string
+	Tooltip   string
+	Disabled  bool
 }
 
 type clickableMenuItem interface {
@@ -59,8 +60,8 @@ func (c *submenuController) Sync(entries []submenuEntry) {
 		if !ok {
 			item = c.parent.AddSubMenuItem(entry.Title, entry.Tooltip)
 			c.items[entry.Key] = item
-			if c.bind != nil {
-				c.bind(item, entry.Key)
+			if c.bind != nil && entry.ActionKey != "" {
+				c.bind(item, entry.ActionKey)
 			}
 		}
 
