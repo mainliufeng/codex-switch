@@ -4,6 +4,10 @@
 
 当前版本已经包含托盘图标和启动器图标。
 
+## 截图
+
+![Codex Switch systray screenshot](assets/systray.png)
+
 它只做本地快照管理，不负责登录流程：
 
 - 保存当前 `~/.codex/auth.json`
