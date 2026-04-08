@@ -31,6 +31,8 @@ func TestFormatProgressBar(t *testing.T) {
 
 func TestBuildSwitchEntriesIncludesClickableAccountRowsAndUsageRows(t *testing.T) {
 	updatedAt := time.Date(2026, 4, 1, 21, 18, 0, 0, time.FixedZone("CST", 8*60*60))
+	fiveHourResetAt := time.Date(2026, 4, 1, 23, 36, 0, 0, time.FixedZone("CST", 8*60*60))
+	weeklyResetAt := time.Date(2026, 4, 2, 9, 0, 0, 0, time.FixedZone("CST", 8*60*60))
 	overview := core.Overview{
 		Accounts: []core.Account{
 			{
@@ -42,6 +44,8 @@ func TestBuildSwitchEntriesIncludesClickableAccountRowsAndUsageRows(t *testing.T
 					UpdatedAt:         updatedAt,
 					FiveHourRemaining: 50,
 					WeeklyRemaining:   80,
+					FiveHourResetAt:   fiveHourResetAt,
+					WeeklyResetAt:     weeklyResetAt,
 				},
 			},
 			{
@@ -54,9 +58,9 @@ func TestBuildSwitchEntriesIncludesClickableAccountRowsAndUsageRows(t *testing.T
 		},
 	}
 
-	entries := buildSwitchEntries(overview)
-	if len(entries) != 7 {
-		t.Fatalf("expected 7 switch rows, got %d", len(entries))
+	entries := buildSwitchEntriesAt(overview, updatedAt)
+	if len(entries) != 11 {
+		t.Fatalf("expected 11 switch rows, got %d", len(entries))
 	}
 
 	if entries[0].Title != "[当前] alice@example.com" {
@@ -71,28 +75,65 @@ func TestBuildSwitchEntriesIncludesClickableAccountRowsAndUsageRows(t *testing.T
 	if entries[1].Tooltip != "5h 剩余 50%" {
 		t.Fatalf("unexpected five-hour tooltip: %q", entries[1].Tooltip)
 	}
-	if entries[2].Title != "周窗  ████████░░  80%" {
-		t.Fatalf("unexpected weekly row: %q", entries[2].Title)
+	if entries[2].Title != "    2h18m 后刷新" {
+		t.Fatalf("unexpected five-hour reset row: %q", entries[2].Title)
 	}
-	if entries[2].Tooltip != "周剩余 80%" {
-		t.Fatalf("unexpected weekly tooltip: %q", entries[2].Tooltip)
+	if entries[2].Tooltip != "5h 窗口将在 2h18m 后刷新" {
+		t.Fatalf("unexpected five-hour reset tooltip: %q", entries[2].Tooltip)
 	}
-	if entries[3].Title != " " {
-		t.Fatalf("expected separator row, got %q", entries[3].Title)
+	if entries[3].Title != "周窗  ████████░░  80%" {
+		t.Fatalf("unexpected weekly row: %q", entries[3].Title)
 	}
-	if entries[4].Title != "[可切换] bob@example.com" {
+	if entries[3].Tooltip != "周剩余 80%" {
+		t.Fatalf("unexpected weekly tooltip: %q", entries[3].Tooltip)
+	}
+	if entries[4].Title != "    周四 09:00 刷新" {
+		t.Fatalf("unexpected weekly reset row: %q", entries[4].Title)
+	}
+	if entries[4].Tooltip != "周窗口将在 周四 09:00 刷新" {
+		t.Fatalf("unexpected weekly reset tooltip: %q", entries[4].Tooltip)
+	}
+	if entries[5].Title != " " {
+		t.Fatalf("expected separator row, got %q", entries[5].Title)
+	}
+	if entries[6].Title != "[可切换] bob@example.com" {
 		t.Fatalf("unexpected second account title: %q", entries[4].Title)
 	}
-	if entries[4].Disabled {
+	if entries[6].Disabled {
 		t.Fatal("expected switchable account row to stay enabled")
 	}
-	if entries[5].Title != "５ｈ  暂不可用" {
+	if entries[7].Title != "５ｈ  暂不可用" {
 		t.Fatalf("unexpected loading/error five-hour row: %q", entries[5].Title)
 	}
-	if entries[6].Title != "周窗  暂不可用" {
+	if entries[8].Title != "    暂不可用" {
+		t.Fatalf("unexpected loading/error five-hour reset row: %q", entries[8].Title)
+	}
+	if entries[9].Title != "周窗  暂不可用" {
 		t.Fatalf("unexpected loading/error weekly row: %q", entries[6].Title)
 	}
-	if entries[6].Tooltip != "codex CLI not found" {
-		t.Fatalf("unexpected error tooltip: %q", entries[6].Tooltip)
+	if entries[10].Title != "    暂不可用" {
+		t.Fatalf("unexpected loading/error weekly reset row: %q", entries[10].Title)
+	}
+	if entries[10].Tooltip != "codex CLI not found" {
+		t.Fatalf("unexpected error tooltip: %q", entries[10].Tooltip)
+	}
+}
+
+func TestFormatResetDescriptions(t *testing.T) {
+	now := time.Date(2026, 4, 8, 10, 0, 0, 0, time.FixedZone("CST", 8*60*60))
+
+	fiveHourReset := time.Date(2026, 4, 8, 12, 18, 0, 0, now.Location())
+	if got := formatFiveHourResetLine(fiveHourReset, now); got != "    2h18m 后刷新" {
+		t.Fatalf("unexpected five-hour reset line: %q", got)
+	}
+
+	weeklyReset := time.Date(2026, 4, 10, 9, 0, 0, 0, now.Location())
+	if got := formatWeeklyResetLine(weeklyReset, now); got != "    周五 09:00 刷新" {
+		t.Fatalf("unexpected weekly reset line: %q", got)
+	}
+
+	farReset := time.Date(2026, 4, 15, 9, 0, 0, 0, now.Location())
+	if got := formatWeeklyResetLine(farReset, now); got != "    4/15 09:00 刷新" {
+		t.Fatalf("unexpected far weekly reset line: %q", got)
 	}
 }

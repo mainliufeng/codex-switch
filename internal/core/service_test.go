@@ -63,6 +63,8 @@ func TestBuildOverviewIncludesUsageAndErrors(t *testing.T) {
 	}
 
 	refreshedAt := time.Date(2026, 4, 1, 20, 15, 0, 0, time.UTC)
+	fiveHourResetAt := refreshedAt.Add(2*time.Hour + 18*time.Minute)
+	weeklyResetAt := refreshedAt.Add(7 * 24 * time.Hour)
 	overview := buildOverview(
 		store,
 		"bob@example.com",
@@ -77,6 +79,8 @@ func TestBuildOverviewIncludesUsageAndErrors(t *testing.T) {
 					FiveHourRemaining: 92,
 					WeeklyRemaining:   88,
 					UpdatedAt:         refreshedAt,
+					FiveHourResetAt:   fiveHourResetAt,
+					WeeklyResetAt:     weeklyResetAt,
 				},
 			},
 			"alice@example.com": {
@@ -104,6 +108,12 @@ func TestBuildOverviewIncludesUsageAndErrors(t *testing.T) {
 	}
 	if current.Usage == nil || current.Usage.PlanType != "plus" {
 		t.Fatalf("expected current usage snapshot, got %+v", current.Usage)
+	}
+	if !current.Usage.FiveHourResetAt.Equal(fiveHourResetAt) {
+		t.Fatalf("expected five-hour reset time to propagate, got %+v", current.Usage)
+	}
+	if !current.Usage.WeeklyResetAt.Equal(weeklyResetAt) {
+		t.Fatalf("expected weekly reset time to propagate, got %+v", current.Usage)
 	}
 
 	other := overview.Accounts[1]
@@ -137,6 +147,8 @@ func TestServiceOverviewReadsSavedProfilesAndCurrentAuth(t *testing.T) {
 				FiveHourRemaining: 95,
 				WeeklyRemaining:   90,
 				UpdatedAt:         time.Now(),
+				FiveHourResetAt:   time.Now().Add(30 * time.Minute),
+				WeeklyResetAt:     time.Now().Add(72 * time.Hour),
 			},
 			filepath.Join(store.ProfilesDir, "alice@example.com.json"): {
 				Email:             "alice@example.com",
@@ -144,6 +156,8 @@ func TestServiceOverviewReadsSavedProfilesAndCurrentAuth(t *testing.T) {
 				FiveHourRemaining: 80,
 				WeeklyRemaining:   70,
 				UpdatedAt:         time.Now(),
+				FiveHourResetAt:   time.Now().Add(90 * time.Minute),
+				WeeklyResetAt:     time.Now().Add(24 * time.Hour),
 			},
 		},
 	})

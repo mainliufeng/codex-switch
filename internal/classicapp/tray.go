@@ -16,6 +16,8 @@ import (
 	"github.com/getlantern/systray"
 )
 
+const autoRefreshInterval = 10 * time.Minute
+
 type TrayApp struct {
 	store   *profiles.Store
 	service *core.Service
@@ -24,6 +26,7 @@ type TrayApp struct {
 
 	currentItem *systray.MenuItem
 	statusItem  *systray.MenuItem
+	statusText  string
 	saveItem    *systray.MenuItem
 	reloadItem  *systray.MenuItem
 	switchRoot  *systray.MenuItem
@@ -34,6 +37,11 @@ type TrayApp struct {
 	switchMenu *submenuController
 	deleteMenu *submenuController
 	refreshSeq uint64
+}
+
+type overviewLoadOptions struct {
+	status       string
+	updateStatus bool
 }
 
 func NewTrayApp(store *profiles.Store) *TrayApp {
@@ -57,6 +65,7 @@ func (a *TrayApp) onReady() {
 
 	a.statusItem = systray.AddMenuItem("状态: 启动中...", "最近一次操作结果")
 	a.statusItem.Disable()
+	a.statusText = "启动中..."
 
 	systray.AddSeparator()
 
@@ -96,6 +105,7 @@ func (a *TrayApp) onReady() {
 	a.bindBaseActions()
 
 	go a.loadOverview("已就绪")
+	go a.startAutoRefreshLoop()
 }
 
 func (a *TrayApp) onExit() {}
@@ -166,7 +176,15 @@ func (a *TrayApp) bindDeleteAction(item clickableMenuItem, email string) {
 }
 
 func (a *TrayApp) loadOverview(status string) {
+	a.loadOverviewWithOptions(overviewLoadOptions{
+		status:       status,
+		updateStatus: true,
+	})
+}
+
+func (a *TrayApp) loadOverviewWithOptions(options overviewLoadOptions) {
 	seq := a.beginRefresh()
+	currentStatus := a.currentStatusText()
 
 	overview, err := a.service.OverviewWithoutUsage()
 	if err != nil {
@@ -175,8 +193,10 @@ func (a *TrayApp) loadOverview(status string) {
 
 		a.currentItem.SetTitle("当前: 未检测到有效账号")
 		a.currentItem.SetTooltip(shortenError(err))
-		a.statusItem.SetTitle("状态: " + status)
-		a.statusItem.SetTooltip(status)
+		statusText := resolveStatusText(currentStatus, options.status, options.updateStatus)
+		a.statusItem.SetTitle("状态: " + statusText)
+		a.statusItem.SetTooltip(statusText)
+		a.statusText = statusText
 
 		errorEntry := []submenuEntry{{
 			Key:      "__error__",
@@ -191,13 +211,16 @@ func (a *TrayApp) loadOverview(status string) {
 		return
 	}
 
-	a.syncOverview(overview, status+" · 用量同步中")
+	a.syncOverviewWithOptions(overview, overviewLoadOptions{
+		status:       resolveStatusText(currentStatus, options.status+" · 用量同步中", options.updateStatus),
+		updateStatus: options.updateStatus,
+	})
 
-	go func(refreshSeq uint64, label string) {
+	go func(refreshSeq uint64, options overviewLoadOptions) {
 		fullOverview, err := a.service.Overview(a.requestContext())
 		if err != nil {
-			if a.isCurrentRefresh(refreshSeq) {
-				a.setStatus(label + " · 用量同步失败")
+			if a.isCurrentRefresh(refreshSeq) && options.updateStatus {
+				a.setStatus(options.status + " · 用量同步失败")
 			}
 			return
 		}
@@ -206,8 +229,11 @@ func (a *TrayApp) loadOverview(status string) {
 			return
 		}
 
-		a.syncOverview(fullOverview, label)
-	}(seq, status)
+		a.syncOverviewWithOptions(fullOverview, overviewLoadOptions{
+			status:       resolveStatusText(currentStatus, options.status, options.updateStatus),
+			updateStatus: options.updateStatus,
+		})
+	}(seq, options)
 }
 
 func (a *TrayApp) beginRefresh() uint64 {
@@ -231,6 +257,13 @@ func (a *TrayApp) setStatus(status string) {
 }
 
 func (a *TrayApp) syncOverview(overview core.Overview, status string) {
+	a.syncOverviewWithOptions(overview, overviewLoadOptions{
+		status:       status,
+		updateStatus: true,
+	})
+}
+
+func (a *TrayApp) syncOverviewWithOptions(overview core.Overview, options overviewLoadOptions) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
@@ -243,8 +276,11 @@ func (a *TrayApp) syncOverview(overview core.Overview, status string) {
 	a.currentItem.SetTitle(currentTitle)
 	a.currentItem.SetTooltip(currentTooltip)
 
-	a.statusItem.SetTitle("状态: " + status)
-	a.statusItem.SetTooltip(status)
+	if options.updateStatus {
+		a.statusItem.SetTitle("状态: " + options.status)
+		a.statusItem.SetTooltip(options.status)
+		a.statusText = options.status
+	}
 
 	a.switchRoot.SetTitle(fmt.Sprintf("切换账号 (%d)", len(overview.Accounts)))
 
@@ -262,6 +298,10 @@ func (a *TrayApp) syncOverview(overview core.Overview, status string) {
 
 func buildSwitchEntries(overview core.Overview) []submenuEntry {
 	return buildSwitchUsageEntries(overview)
+}
+
+func buildSwitchEntriesAt(overview core.Overview, now time.Time) []submenuEntry {
+	return buildSwitchUsageEntriesAt(overview, now)
 }
 
 func buildDeleteEntries(overview core.Overview) []submenuEntry {
@@ -300,4 +340,40 @@ func shortenError(err error) string {
 	}
 
 	return message
+}
+
+func (a *TrayApp) startAutoRefreshLoop() {
+	ticker := time.NewTicker(autoRefreshInterval)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		a.refreshUsageSilently()
+	}
+}
+
+func (a *TrayApp) refreshUsageSilently() {
+	overview, err := a.service.Overview(a.requestContext())
+	if err != nil {
+		return
+	}
+
+	a.syncOverviewWithOptions(overview, overviewLoadOptions{
+		updateStatus: false,
+	})
+}
+
+func resolveStatusText(current string, next string, update bool) string {
+	if update {
+		return next
+	}
+	if strings.TrimSpace(current) != "" {
+		return current
+	}
+	return next
+}
+
+func (a *TrayApp) currentStatusText() string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.statusText
 }

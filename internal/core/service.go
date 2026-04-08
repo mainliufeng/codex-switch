@@ -44,6 +44,8 @@ type UsageState struct {
 	UpdatedAt         time.Time `json:"updatedAt,omitempty"`
 	FiveHourRemaining int       `json:"fiveHourRemaining"`
 	WeeklyRemaining   int       `json:"weeklyRemaining"`
+	FiveHourResetAt   time.Time `json:"fiveHourResetAt,omitempty"`
+	WeeklyResetAt     time.Time `json:"weeklyResetAt,omitempty"`
 }
 
 type accountTarget struct {
@@ -138,6 +140,8 @@ func buildOverview(store *profiles.Store, currentEmail string, savedProfiles []p
 					UpdatedAt:         result.Snapshot.UpdatedAt,
 					FiveHourRemaining: result.Snapshot.FiveHourRemaining,
 					WeeklyRemaining:   result.Snapshot.WeeklyRemaining,
+					FiveHourResetAt:   result.Snapshot.FiveHourResetAt,
+					WeeklyResetAt:     result.Snapshot.WeeklyResetAt,
 				}
 			case result.Error != "":
 				account.UsageState = "error"

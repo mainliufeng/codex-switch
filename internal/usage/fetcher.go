@@ -24,6 +24,8 @@ type Snapshot struct {
 	PlanType          string
 	FiveHourRemaining int
 	WeeklyRemaining   int
+	FiveHourResetAt   time.Time
+	WeeklyResetAt     time.Time
 	UpdatedAt         time.Time
 }
 
@@ -112,13 +114,7 @@ func (f *Fetcher) FetchFromAuthFile(ctx context.Context, authPath string) (*Snap
 		return nil, fmt.Errorf("decode rate limits: %w", err)
 	}
 
-	return &Snapshot{
-		Email:             account.Account.Email,
-		PlanType:          rateLimits.RateLimits.PlanType,
-		FiveHourRemaining: max(0, 100-rateLimits.RateLimits.Primary.UsedPercent),
-		WeeklyRemaining:   max(0, 100-rateLimits.RateLimits.Secondary.UsedPercent),
-		UpdatedAt:         time.Now(),
-	}, nil
+	return buildSnapshot(account, rateLimits, time.Now()), nil
 }
 
 type accountResult struct {
@@ -136,7 +132,8 @@ type rateLimitsResult struct {
 }
 
 type rateLimitWindow struct {
-	UsedPercent int `json:"usedPercent"`
+	UsedPercent int   `json:"usedPercent"`
+	ResetsAt    int64 `json:"resetsAt"`
 }
 
 type rpcClient struct {
@@ -350,4 +347,28 @@ func ensurePathContains(env []string, extra string) []string {
 	}
 
 	return replaceEnv(env, "PATH", extra+string(os.PathListSeparator)+currentPath)
+}
+
+func buildSnapshot(account accountResult, rateLimits rateLimitsResult, updatedAt time.Time) *Snapshot {
+	return &Snapshot{
+		Email:             account.Account.Email,
+		PlanType:          rateLimits.RateLimits.PlanType,
+		FiveHourRemaining: max(0, 100-rateLimits.RateLimits.Primary.UsedPercent),
+		WeeklyRemaining:   max(0, 100-rateLimits.RateLimits.Secondary.UsedPercent),
+		FiveHourResetAt:   parseResetTime(rateLimits.RateLimits.Primary.ResetsAt),
+		WeeklyResetAt:     parseResetTime(rateLimits.RateLimits.Secondary.ResetsAt),
+		UpdatedAt:         updatedAt,
+	}
+}
+
+func parseResetTime(value int64) time.Time {
+	if value <= 0 {
+		return time.Time{}
+	}
+
+	if value >= 1_000_000_000_000 {
+		return time.UnixMilli(value)
+	}
+
+	return time.Unix(value, 0)
 }
